@@ -52,7 +52,7 @@ class UniformPattern(pzp.Piece, PatternGenerator):
     PARAM_PHASE = "Phase"
 
     def define_params(self):
-        pzp.param.spinbox(self, UniformPattern.PARAM_PHASE, 50, 2, 3000)(None)
+        pzp.param.spinbox(self, UniformPattern.PARAM_PHASE, 50, 0, 1023)(None)
     
     def define_actions(self):
         @pzp.action.define(self, PatternGenerator.ACTION_SEND)
