@@ -35,8 +35,8 @@ class SLMPiece(image_preview.ImagePreview, pzp.Piece):
         
         pzp.param.spinbox(self, SLMPiece.PARAM_DISPLAY_NB, 2, 1, 10, visible=False)(None)
         pzp.param.spinbox(self, SLMPiece.PARAM_CTRL_NB, 1, 1, 8, visible=False)(None)
-        pzp.param.spinbox(self, SLMPiece.PARAM_WAVELENGTH, 635, 400, 1300, visible=False)(None)
-        pzp.param.spinbox(self, SLMPiece.PARAM_PHASE, 200, 0, 200, visible=False)(None)
+        pzp.param.spinbox(self, SLMPiece.PARAM_WAVELENGTH, 635, 400, 1400, visible=False)(None)
+        pzp.param.spinbox(self, SLMPiece.PARAM_PHASE, 200, 0, 999, visible=False)(None)
         pzp.param.checkbox(self, SLMPiece.PARAM_WL_SAVE, 1, visible=False)(None)
 
         pzp.param.array(self, SLMPiece.PARAM_SLM_DIMENSIONS, visible=False)(None)
