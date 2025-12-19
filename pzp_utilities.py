@@ -63,6 +63,28 @@ class UniformPattern(pzp.Piece, PatternGenerator):
             phase = self[UniformPattern.PARAM_PHASE].value
             self.send_image_to_slm(np.ones(slm_dim)*phase)
 
+class BinaryGrating(pzp.Piece, PatternGenerator):
+    PARAM_PHASE = "Peak phase"
+    PARAM_PERIOD = "Period (px)"
+    PARAM_DUTY_CYCLE = "Duty cycle"
+
+    def define_params(self):
+        pzp.param.spinbox(self, BinaryGrating.PARAM_PHASE, 512, 0, 1023)(None)
+        pzp.param.spinbox(self, BinaryGrating.PARAM_PERIOD, 25, 2, 1023)(None)
+        pzp.param.spinbox(self, BinaryGrating.PARAM_DUTY_CYCLE, 0.5, 0.0, 1.0, v_step=0.05)(None)
+    
+    def define_actions(self):
+        @pzp.action.define(self, PatternGenerator.ACTION_SEND)
+        def generate():
+            slm_dim = self.check_slm_status()
+            if slm_dim is None:
+                return
+            phase = self[BinaryGrating.PARAM_PHASE].value
+            period = self[BinaryGrating.PARAM_PERIOD].value
+            duty_cycle = self[BinaryGrating.PARAM_DUTY_CYCLE].value
+            pattern = np.zeros(slm_dim)
+            pattern[:, np.arange(0, slm_dim[1])%period < period*duty_cycle] = phase
+            self.send_image_to_slm(pattern)
 
 def clamp(value, min_, max_):
     return min(max(value, min_), max_)
