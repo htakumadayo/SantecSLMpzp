@@ -27,19 +27,126 @@ FLAGS_COLOR_GRAY  = 0x00000008
 FLAGS_COLOR_10BIT = 0x00000100
 FLAGS_RATE120     = 0x20000000
 
-SLM_OK = 0  # OK
-SLM_NG = 1	# NG
-SLM_BS = 2	# Busy
-SLM_ER = 3  # parameter ER
-SLM_INVAID_MONITOR = -1  # not find display no
-SLM_NOT_OPEN_MONITOR = -2  # not open display
-SLM_OPEN_WINDOW_ERR = -3  # window open error
-SLM_DATA_FORMAT_ERR = -4  # data foramt error
-SLM_FILE_READ_ERR = -101  # not find  file
-SLM_NOT_OPEN_USB = -200  # not open usb
-SLM_OTHER_ERROR = -1000  # other error
-SLM_FTDI_ERROR  = -10000
+# -------------------------
+# SLM_STATUS return values
+# -------------------------
+SLM_OK = 0
+SLM_NG = 1
+SLM_BS = 2
+SLM_ER = 3
+
+SLM_INVAID_MONITOR = -1
+SLM_NOT_OPEN_MONITOR = -2
+SLM_OPEN_WINDOW_ERR = -3
+SLM_DATA_FORMAT_ERR = -4
+SLM_FILE_READ_ERR = -101
+SLM_NOT_OPEN_USB = -200
+SLM_OTHER_ERROR = -1000
+
+# -------------------------
+# FTDI (USB driver) errors
+# -------------------------
+FT_INVALID_HANDLE = -10001
+FT_DEVICE_NOT_FOUND = -10002
+FT_DEVICE_NOT_OPENED = -10003
+FT_IO_ERROR = -10004
+FT_INSUFFICIENT_RESOURCES = -10005
+FT_INVALID_PARAMETER = -10006
+FT_INVALID_BAUD_RATE = -10007
+FT_DEVICE_NOT_OPENED_FOR_ERASE = -10008
+FT_DEVICE_NOT_OPENED_FOR_WRITE = -10009
+FT_FAILED_TO_WRITE_DEVICE = -10010
+FT_EEPROM_READ_FAILED = -10011
+FT_EEPROM_WRITE_FAILED = -10012
+FT_EEPROM_ERASE_FAILED = -10013
+FT_EEPROM_NOT_PRESENT = -10014
+FT_EEPROM_NOT_PROGRAMMED = -10015
+FT_INVALID_ARGS = -10016
+FT_NOT_SUPPORTED = -10017
+FT_NO_MORE_ITEMS = -10018
+FT_TIMEOUT = -10019
+FT_OPERATION_ABORTED = -10020
+FT_RESERVED_PIPE = -10021
+FT_INVALID_CONTROL_REQUEST_DIRECTION = -10022
+FT_INVALID_CONTROL_REQUEST_TYPE = -10023
+FT_IO_PENDING = -10024
+FT_IO_INCOMPLETE = -10025
+FT_HANDLE_EOF = -10026
+FT_BUSY = -10027
+FT_NO_SYSTEM_RESOURCES = -10028
+FT_DEVICE_LIST_NOT_READY = -10029
+FT_DEVICE_NOT_CONNECTED = -10030
+FT_INCORRECT_DEVICE_PATH = -10031
+FT_OTHER_ERROR = -10032
+
+
+ERROR_MSGs = {
+    SLM_OK: "OK",
+    SLM_NG: "NG",
+    SLM_BS: "SLM is busy",
+    SLM_ER: "parameter error",
+
+    SLM_INVAID_MONITOR: "display no not found",
+    SLM_NOT_OPEN_MONITOR: "display not opened",
+    SLM_OPEN_WINDOW_ERR: "window open error",
+    SLM_DATA_FORMAT_ERR: "data format error",
+    SLM_FILE_READ_ERR: "file read error (over 1023?)",
+    SLM_NOT_OPEN_USB: "USB not opened",
+    SLM_OTHER_ERROR: "other error",
+
+    FT_INVALID_HANDLE: "USB driver error (invalid handle)",
+    FT_DEVICE_NOT_FOUND: "device not found (check power/connection; if connected, reset power)",
+    FT_DEVICE_NOT_OPENED: "device already opened",
+    FT_IO_ERROR: "USB driver error (I/O error)",
+    FT_INSUFFICIENT_RESOURCES: "USB driver error (insufficient resources)",
+    FT_INVALID_PARAMETER: "USB driver error (invalid parameter)",
+    FT_INVALID_BAUD_RATE: "USB driver error (invalid baud rate)",
+    FT_DEVICE_NOT_OPENED_FOR_ERASE: "USB driver error (not opened for erase)",
+    FT_DEVICE_NOT_OPENED_FOR_WRITE: "USB driver error (not opened for write)",
+    FT_FAILED_TO_WRITE_DEVICE: "USB driver error (failed to write device)",
+    FT_EEPROM_READ_FAILED: "USB driver error (EEPROM read failed)",
+    FT_EEPROM_WRITE_FAILED: "USB driver error (EEPROM write failed)",
+    FT_EEPROM_ERASE_FAILED: "USB driver error (EEPROM erase failed)",
+    FT_EEPROM_NOT_PRESENT: "USB driver error (EEPROM not present)",
+    FT_EEPROM_NOT_PROGRAMMED: "USB driver error (EEPROM not programmed)",
+    FT_INVALID_ARGS: "USB driver error (invalid args)",
+    FT_NOT_SUPPORTED: "USB driver error (not supported)",
+    FT_NO_MORE_ITEMS: "USB driver error (no more items)",
+    FT_TIMEOUT: "USB driver error (timeout)",
+    FT_OPERATION_ABORTED: "USB driver error (operation aborted)",
+    FT_RESERVED_PIPE: "USB driver error (reserved pipe)",
+    FT_INVALID_CONTROL_REQUEST_DIRECTION: "USB driver error (invalid control request direction)",
+    FT_INVALID_CONTROL_REQUEST_TYPE: "USB driver error (invalid control request type)",
+    FT_IO_PENDING: "USB driver error (I/O pending)",
+    FT_IO_INCOMPLETE: "USB driver error (I/O incomplete)",
+    FT_HANDLE_EOF: "USB driver error (handle EOF)",
+    FT_BUSY: "USB driver error (busy)",
+    FT_NO_SYSTEM_RESOURCES: "USB driver error (no system resources)",
+    FT_DEVICE_LIST_NOT_READY: "USB driver error (device list not ready)",
+    FT_DEVICE_NOT_CONNECTED: "USB driver error (device not connected)",
+    FT_INCORRECT_DEVICE_PATH: "USB driver error (incorrect device path)",
+    FT_OTHER_ERROR: "USB driver error (other error)",
+}
 # End of typedefs and constants 
+
+def check_error(return_code, optional_header_msg=""):
+    """
+    Raise a RuntimeError if argument return_code is NOT SLM_OK. 
+    This function tries to find the corresponding error description, which is included in error message.
+
+    Args:
+        return_code (int): Status code returned by SLM API
+        optional_header_msg (str): Extra info added at the start of error message
+    
+    Returns:
+        None
+    """
+    if return_code == SLM_OK:
+        return
+    if return_code in ERROR_MSGs.keys():
+        raise RuntimeError(f"{optional_header_msg} SLM returned error code {return_code}. Description: {ERROR_MSGs[return_code]}")
+    else:
+        raise RuntimeError(f"{optional_header_msg} SLM returned unknown error code.")
 
 class SLM:
     def __init__(self, path_to_dll=None):

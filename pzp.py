@@ -2,7 +2,7 @@ import puzzlepiece as pzp
 from puzzlepiece.extras import hardware_tools as pht
 from pzp_hardware.generic.mixins import image_preview
 import numpy as np
-import SantecSLM.interface as interface
+import SantecSLM.interface as itf
 
 
 """ Puzzlepiece pieces designed for Santec SLM(especially 200)"""
@@ -11,7 +11,7 @@ dummy_SLM_dimension = (1200, 1920)  # (height, width)
 
 
 # Dict key of Puzzle.globals for SLM api object.
-SANTEC_SLM_API = "SANTEC_SLM_API"
+SANTEC_SLM_API = "SANTEC_SLM200_API"
 
 class SLMPiece(image_preview.ImagePreview, pzp.Piece):
     live_toggle = False # include a toggle to enable live mode
@@ -27,6 +27,8 @@ class SLMPiece(image_preview.ImagePreview, pzp.Piece):
     PARAM_PHASE = "Phase"   # Maybe put an explicit description for this param
     PARAM_SLM_DIMENSIONS = "SLM dimensions"
     PARAM_WL_SAVE = "Save permanently λ and phase on update"
+    PARAM_IMAGE = "image"
+    PARAM_CONNECTED = "connected"
 
     ACTION_UPDATE_WL = "Update target wavelength and phase"
 
@@ -48,71 +50,67 @@ class SLMPiece(image_preview.ImagePreview, pzp.Piece):
                 return 1
             
             # If not in debug mode
-            slm = self.puzzle.globals[SANTEC_SLM_API]
+            slm: itf.SLM = self.puzzle.globals[SANTEC_SLM_API]
             display_nb = self[SLMPiece.PARAM_DISPLAY_NB].value
             slm_nb = self[SLMPiece.PARAM_CTRL_NB].value
 
-            disp_status = slm.SLM_Disp_Open(display_nb)
-            ctrl_status = slm.SLM_Ctrl_Open(slm_nb)
-            print(disp_status, ctrl_status)
-            _, width, height = slm.SLM_Disp_Info(display_nb)
-            _, wavelength, phase = slm.SLM_Ctrl_ReadWL(slm_nb)
+            itf.check_error(slm.SLM_Disp_Open(display_nb))
+            itf.check_error(slm.SLM_Ctrl_Open(slm_nb))
 
-            if disp_status == interface.SLM_OK and ctrl_status == interface.SLM_OK:
-                self[SLMPiece.PARAM_SLM_DIMENSIONS].set_value(np.array((height, width)))
-                self[SLMPiece.PARAM_WAVELENGTH].set_value(wavelength)
-                self[SLMPiece.PARAM_PHASE].set_value(phase)
-                return 1
-            else:
-                return 0
+            rcode, width, height = slm.SLM_Disp_Info(display_nb)
+            itf.check_error(rcode)
+
+            rcode, wavelength, phase = slm.SLM_Ctrl_ReadWL(slm_nb)
+            itf.check_error(rcode)
+
+            self[SLMPiece.PARAM_SLM_DIMENSIONS].set_value(np.array((height, width)))
+            self[SLMPiece.PARAM_WAVELENGTH].set_value(wavelength)
+            self[SLMPiece.PARAM_PHASE].set_value(phase)
+            return 1
 
         @pzp.param.disconnect(self)
         def disconnect():
             if not self.puzzle.debug:
                 slm = self.puzzle.globals[SANTEC_SLM_API]
-                slm.SLM_Disp_Close(self[SLMPiece.PARAM_DISPLAY_NB].value)
-                slm.SLM_Ctrl_Close(self[SLMPiece.PARAM_CTRL_NB].value)
+                itf.check_error(slm.SLM_Disp_Close(self[SLMPiece.PARAM_DISPLAY_NB].value))
+                itf.check_error(slm.SLM_Ctrl_Close(self[SLMPiece.PARAM_CTRL_NB].value))
             return 0
         
-        @pzp.param.array(self, "image")
+        @pzp.param.array(self, self.PARAM_IMAGE)
         def image():
-            return self["image"].value
+            return self[self.PARAM_IMAGE].value
         
         @image.set_setter(self)
         def image_setter(value):
-            if self["connected"].value is not True:
+            if self[self.PARAM_CONNECTED].value is not True:
                 return None
             slm_dim = self[SLMPiece.PARAM_SLM_DIMENSIONS].value.astype(int)
             if slm_dim[0] != value.shape[0] or slm_dim[1] != value.shape[1]:
-                print(slm_dim, value.shape)
-                raise ValueError("Image doesn't have same dimension as SLM")
+                raise ValueError(f"Pattern doesn't have dimension of SLM: SLM dim: {slm_dim}, pattern dim: {value.shape}")
             if not self.puzzle.debug:
-                self.puzzle.globals[SANTEC_SLM_API].SLM_Disp_Data(
+                rcode = self.puzzle.globals[SANTEC_SLM_API].SLM_Disp_Data(
                     self[SLMPiece.PARAM_DISPLAY_NB].value,
                     value.shape[1], value.shape[0],
-                    interface.FLAGS_COLOR_GRAY, value)
+                    itf.FLAGS_COLOR_GRAY, value)
+                itf.check_error(rcode)
             return value
     
     def define_actions(self):
         @pzp.action.define(self, SLMPiece.ACTION_UPDATE_WL, visible=False)
-        def updateslm(self):
+        def updateslm():
             if self.puzzle.debug:
                 print("Update")
                 return
-            if self["connected"].value is not True:
+            if self[self.PARAM_CONNECTED].value is not True:
                 return
             wl = self[SLMPiece.PARAM_WAVELENGTH].value
             phase = self[SLMPiece.PARAM_PHASE].value
             slm_nb = self[SLMPiece.PARAM_CTRL_NB].value
             slm = self.puzzle.globals[SANTEC_SLM_API]
-            status = slm.SLM_Ctrl_WriteWL(slm_nb, wl, phase)
-            if status != interface.SLM_OK:
-                raise RuntimeError("SLM Error: Write WL failed")
+            itf.check_error(slm.SLM_Ctrl_WriteWL(slm_nb, wl, phase), "Write Wavelength:")
             
             if self[SLMPiece.PARAM_WL_SAVE].value:
-                status = slm.SLM_Ctrl_WriteAW(slm_nb)
-                if status != interface.SLM_OK:
-                    raise RuntimeError("SLM Error: Write AW failed")
+                itf.check_error(slm.SLM_Ctrl_WriteAW(slm_nb), "Save Wavelength:")
                 
         pzp.action.settings(self)
 
@@ -124,7 +122,7 @@ class SLMPiece(image_preview.ImagePreview, pzp.Piece):
                                   default=dll_path, 
                                   description="Santec SLM api dll", 
                                   validator=pht.validator_path_exists)
-            self.puzzle.globals[SANTEC_SLM_API] = interface.SLM(dll_path)
+            self.puzzle.globals[SANTEC_SLM_API] = itf.SLM(dll_path)
 
 if __name__ == "__main__":
     pass
