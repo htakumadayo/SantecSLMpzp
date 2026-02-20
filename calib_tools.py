@@ -322,7 +322,8 @@ class PhaseCorrector(pat.PatternGenerator):
     PARAM_MAX_WL = "Max. wavelength"
     PARAM_IGNORE = "Ignored samples"
     PARAM_CORRECTION = "Correction data"
-    PARAM_CALIB_PIECE_NAME = "Calibration piece name"
+    PARAM_CALIB_FILE = "Calibration file name"
+    PARAM_GRAYSCALES = "Grayscales"
 
     def define_params(self):
         pzp.param.spinbox(self, self.PARAM_MIN_WL, 1050, 1, 9999999)(None)
@@ -330,18 +331,26 @@ class PhaseCorrector(pat.PatternGenerator):
         pzp.param.spinbox(self, self.PARAM_IGNORE, 1, 0, 9999)(None)
         # Column by column (per wavelength) correction data. Each index correcspond to a (2,N) shape matrix that contains calibration curve.
         pzp.param.array(self, self.PARAM_CORRECTION, False)(None) 
-        pzp.param.text(self, self.PARAM_CALIB_PIECE_NAME, UniformAndBinaryCalib.__name__, visible=False)(None)
+        pzp.param.array(self, self.PARAM_GRAYSCALES, False)(None)
+        pzp.param.text(self, self.PARAM_CALIB_FILE, "a.csv", visible=True)(None)
         super().define_params()
 
     def define_actions(self):
         @pzp.action.define(self, "Get correction data")
         def get_calib_data():
-            measure_piece = self.puzzle[self[self.PARAM_CALIB_PIECE_NAME].value]
-            measure_piece[UniformAndBinaryCalib.PARAM_MODE].set_value(UniformAndBinaryCalib.MODE_GRAY)
-            measure_piece[UniformAndBinaryCalib.PARAM_NORMALIZE].set_value(UniformAndBinaryCalib.NORM_PER_WL)
-            measure_piece.actions[UniformAndBinaryCalib.ACTION_MEASURE]()
-            data = measure_piece[UniformAndBinaryCalib.PARAM_CALIB_DATA].value
-            wls = measure_piece[UniformAndBinaryCalib.PARAM_CALIB_WL].value
+            # measure_piece = self.puzzle[self[self.PARAM_CALIB_PIECE_NAME].value]
+            # measure_piece[UniformAndBinaryCalib.PARAM_MODE].set_value(UniformAndBinaryCalib.MODE_GRAY)
+            # measure_piece[UniformAndBinaryCalib.PARAM_NORMALIZE].set_value(UniformAndBinaryCalib.NORM_PER_WL)
+            # measure_piece.actions[UniformAndBinaryCalib.ACTION_MEASURE]()
+            # data = measure_piece[UniformAndBinaryCalib.PARAM_CALIB_DATA].value
+            # wls = measure_piece[UniformAndBinaryCalib.PARAM_CALIB_WL].value
+            df = pd.read_csv(self[self.PARAM_CALIB_FILE].value, index_col=0)
+            data = df.values  # Spectrums
+            contrasts_loaded = df.index.to_numpy()
+            wls = df.columns.to_numpy(dtype=float)
+
+            self[self.PARAM_GRAYSCALES].set_value(contrasts_loaded)
+
             colbycol_calib = []
             col_nb = self.puzzle[self.get_slm_piece_name()][SLMPiece.PARAM_IMAGE].value.shape[1]
             max_wl, min_wl = self[self.PARAM_MAX_WL].value, self[self.PARAM_MIN_WL].value
@@ -357,9 +366,10 @@ class PhaseCorrector(pat.PatternGenerator):
         pattern = self.puzzle[self.get_slm_piece_name()][SLMPiece.PARAM_IMAGE].value.T * 2*np.pi
         ignore = self[self.PARAM_IGNORE].value
         correction_data = self[self.PARAM_CORRECTION].value
+        grayscales = self[self.PARAM_GRAYSCALES].value
         corrected_grayscales = []
         for row in range(pattern.shape[0]):  # I realized later that wavelengths are spread along axis 1 and not 0
-            grayscale, phase = map_grayscale_to_phase(correction_data[row][0, :], correction_data[row][1,:], ignore)
+            grayscale, phase = map_grayscale_to_phase(grayscales, correction_data[row,:], ignore)
             corrected_grayscale = linear_interpolation(pattern[row, :], phase, grayscale)
             corrected_grayscales.append(corrected_grayscale)
         corrected_pattern = np.stack(corrected_grayscales, dtype=int).T  # So fix it here
